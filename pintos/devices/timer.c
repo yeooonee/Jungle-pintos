@@ -19,7 +19,7 @@
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
-
+static struct list sleep_list;//깨어날 시간이 아직안된 스레드 관리
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -34,6 +34,7 @@ static void real_time_sleep (int64_t num, int32_t denom);
    corresponding interrupt. */
 void
 timer_init (void) {
+	list_init (&sleep_list); //자료구조 사용할수있도록 초기상태를 만듬
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
 	   nearest. */
 	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
@@ -125,6 +126,16 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+
+	while(!list_empty (&sleep_list)){//잠자는 스레드 확인
+		struct thread *t =
+			list_entry (list_front (&sleep_list),//리스트 맨앞의 스레드 가져옴
+						struct thread, elem);//리스트 요소 elem포함하는 thread찾음
+		if (t->wake_tick > ticks)//아직 깨어날 시간 안되면 반복 종료
+			break;
+		list_pop_front (&sleep_list);//깨어날 스레드 잠자는 목록제거
+		thread_unblock (t);//해당 스레드 블록에서 레디로 변경
+	}
 	thread_tick ();
 }
 

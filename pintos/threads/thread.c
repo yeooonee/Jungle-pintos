@@ -25,7 +25,7 @@
 #define THREAD_BASIC 0xd42df210
 
 /* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
+   that are ready to run but not actually running. 실제로 실행중이지않은 프로세스담음*/
 static struct list ready_list;
 
 /* Idle thread. */
@@ -51,7 +51,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
-   Controlled by kernel command-line option "-o mlfqs". */
+   Controlled by kernel command-line option "-o mlfqs". 사용할 스케줄러 선택 */
 bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);

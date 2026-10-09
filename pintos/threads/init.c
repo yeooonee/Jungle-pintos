@@ -70,19 +70,19 @@ main (void) {
 	uint64_t mem_end;
 	char **argv;
 
-	/* Clear BSS and get machine's RAM size. */
+	/* Clear BSS and get machine's RAM size. 전역변수 초기상태 설정+램크기사이즈*/
 	bss_init ();
 
 	/* Break command line into arguments and parse options. */
-	argv = read_command_line ();
-	argv = parse_options (argv);
+	argv = read_command_line (); //부팅시 전달된 명려행 인자읽기
+	argv = parse_options (argv); // 명령행 옵션 해석
 
 	/* Initialize ourselves as a thread so we can use locks,
-	   then enable console locking. */
+	   then enable console locking.스레드 시스템 콘솔 초기화 */
 	thread_init ();
 	console_init ();
 
-	/* Initialize memory system. */
+	/* Initialize memory system. 메모리 시스템 초기화*/
 	mem_end = palloc_init ();
 	malloc_init ();
 	paging_init (mem_end);
@@ -92,7 +92,7 @@ main (void) {
 	gdt_init ();
 #endif
 
-	/* Initialize interrupt handlers. */
+	/* Initialize interrupt handlers. 인터럽트 타이머 초기화*/
 	intr_init ();
 	timer_init ();
 	kbd_init ();
@@ -101,7 +101,7 @@ main (void) {
 	exception_init ();
 	syscall_init ();
 #endif
-	/* Start thread scheduler and enable interrupts. */
+	/* Start thread scheduler and enable interrupts. 매우 중요 */
 	thread_start ();
 	serial_init_queue ();
 	timer_calibrate ();
