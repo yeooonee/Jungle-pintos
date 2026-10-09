@@ -11,7 +11,7 @@
 #include "threads/vaddr.h"
 #include "devices/timer.h"
 #include "intrinsic.h"
-#ifdef USERPROG
+#ifdef USERPROG 
 #include "userprog/gdt.h"
 #endif
 
