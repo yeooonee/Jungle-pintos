@@ -27,6 +27,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -56,12 +57,15 @@ bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);
 
+
 static void idle (void *aux UNUSED);
 static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+
+static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -108,6 +112,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init(&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -306,6 +311,41 @@ thread_yield (void) {
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+static bool
+wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	struct thread *ta = list_entry (a, struct thread, elem);
+	struct thread *tb = list_entry (b, struct thread, elem);
+	return ta->wakeup_tick < tb->wakeup_tick;   
+}
+
+void
+thread_sleep (int64_t wakeup_tick){
+	struct thread *curr = thread_current ();
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+	old_level = intr_disable ();
+
+	curr->wakeup_tick = wakeup_tick;
+	list_insert_ordered(&sleep_list, &curr->elem, wakeup_less, NULL);
+	thread_block();
+
+	intr_set_level (old_level);
+}
+
+void
+thread_wakeup(int64_t now_tick) {
+	struct list_elem *e = list_begin (&sleep_list);
+	while (e != list_end (&sleep_list)) {
+		struct thread *t = list_entry (e, struct thread, elem);
+		if (t->wakeup_tick <= now_tick){
+			e = list_remove(e);
+			thread_unblock(t);
+		}else
+			break;
+	}
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
