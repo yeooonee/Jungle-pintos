@@ -29,9 +29,6 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 
-/* sleep(blocked) list - tick 이 남은 리스트들 유지 */
-static struct list sleep_list;
-
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -40,8 +37,6 @@ timer_init (void) {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
 	   nearest. */
 	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
-
-	list_init (&sleep_list);	// 초기화 
 
 	outb (0x43, 0x34);    /* CW: counter 0, LSB then MSB, mode 2, binary. */
 	outb (0x40, count & 0xff);
@@ -92,39 +87,24 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
-/* list_less_func */
-static bool
-p_a_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-	// 두개 스레드 wake_time 필드 비교해서 bool 반환
-	struct thread *thr_a = list_entry(a, struct thread, elem);
-	struct thread *thr_b = list_entry(b, struct thread, elem);
-
-	return thr_a->wakeup_time < thr_b->wakeup_time;
-}
-
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) { // 수정 필요 
 	int64_t start = timer_ticks ();	// 시작 시간 기록
 	enum intr_level old_level;
-	
-	struct thread *thr = thread_current();
 
-	/* 깨어날 시각 계산 */
-	thr->wakeup_time = start + ticks;
-	
 	ASSERT (intr_get_level () == INTR_ON);
 	
+	/* 깨어날 시각 계산 */
+	int wakeup_time = start + ticks;
+
 	/* interrupt 막기 */
 	old_level = intr_disable;
+
+	/* 리스트 삽입 */
+	thread_add_sleep_list(wakeup_time);
 	
-	/* sleep list 에 추가 (ticks 가 상대적으로 ) */
-	// list_push_back(&sleep_list, &thr->elem);
-	list_insert_ordered(&sleep_list, &thr->elem, p_a_less, NULL); 
-	
-	/* 자기 실행이 끝나면 block(sleep) 상태로 넣기 */
-	thread_block();	// blocked
-	
+	/* interrupt 복원 */
 	intr_set_level(old_level);
 }
 
@@ -158,7 +138,12 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
 
-	// 잠든 thread 들 깨우기
+	// 잠든 thread 들 깨우기 
+
+	/* 현재 tick 기준으로 앞에것들만 ready list 로 보내기 */
+
+
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
