@@ -49,6 +49,20 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
+/*timer threads*/
+static struct list sleep_list;//깨어날 시간이 아직안된 스레드 관리
+void thread_sleep_init(){
+	list_init(&sleep_list);
+}
+bool wake_tick_less(
+	const struct list_elem *a,
+	const struct list_elem *b,
+	void*aux){//더 작은 정렬비교함수
+	return list_entry(a, struct thread, elem)->wake_tick < list_entry(b, struct thread, elem)->wake_tick;
+}
+void thread_sleep(struct thread *t){
+	list_insert_ordered(&sleep_list, &t->elem, wake_tick_less, NULL);//깨우기 비교
+}
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". 사용할 스케줄러 선택 */
