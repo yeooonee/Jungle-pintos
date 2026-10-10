@@ -110,29 +110,22 @@ timer_sleep (int64_t ticks) { // 수정 필요
 	
 	struct thread *thr = thread_current();
 
-	// TODO 꺠어날 시각 계산
+	/* 깨어날 시각 계산 */
 	thr->wakeup_time = start + ticks;
 	
 	ASSERT (intr_get_level () == INTR_ON);
 	
-	// interrupt 막기
+	/* interrupt 막기 */
 	old_level = intr_disable;
 	
-	// sleep list 에 추가 (ticks 가 상대적으로 )
+	/* sleep list 에 추가 (ticks 가 상대적으로 ) */
 	// list_push_back(&sleep_list, &thr->elem);
 	list_insert_ordered(&sleep_list, &thr->elem, p_a_less, NULL); 
-	// TODO 왜 NULL 넣는지 aux 가 뭐세요 -> 
 	
-	// 자기 실행이 끝나면 block(sleep) 상태로 넣기 
+	/* 자기 실행이 끝나면 block(sleep) 상태로 넣기 */
 	thread_block();	// blocked
-
-	// remove ready list ??? 
 	
 	intr_set_level(old_level);
-
-
-	// while (timer_elapsed (start) < ticks)	// sleep 을 시작한 뒤 지금까지 흐른 틱 수 
-	// thread_yield (); //ready
 }
 
 /* Suspends execution for approximately MS milliseconds. */
