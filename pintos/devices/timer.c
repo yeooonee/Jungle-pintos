@@ -93,17 +93,16 @@ timer_elapsed (int64_t then) {
 void
 timer_sleep (int64_t ticks) {
 	struct thread *t = thread_current ();
-
-	int64_t start = timer_ticks ();
 	ASSERT (intr_get_level () == INTR_ON);
 	
 	enum intr_level old_level = intr_disable();//끄기전 이전인스트럽트저장
+	int64_t start = timer_ticks ();
 	t -> wake_tick=start + ticks;
+	
 	thread_sleep(t);
 	thread_block();
 	intr_set_level(old_level);//스레드 다시 실행하고 이전인스트럽트 복구
 	
-
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -134,7 +133,9 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+	thread_wake();
 	thread_tick ();
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

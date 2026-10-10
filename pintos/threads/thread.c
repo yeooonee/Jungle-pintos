@@ -60,9 +60,23 @@ bool wake_tick_less(
 	void*aux){//더 작은 정렬비교함수
 	return list_entry(a, struct thread, elem)->wake_tick < list_entry(b, struct thread, elem)->wake_tick;
 }
-void thread_sleep(struct thread *t){
+void thread_sleep(struct thread *t){//정렬
 	list_insert_ordered(&sleep_list, &t->elem, wake_tick_less, NULL);//깨우기 비교
 }
+//잠들어 있는 스레드 시간된거 깨우기
+void thread_wake(int64_t ticks){
+	while(!list_empty(&sleep_list)){//리스트 비어있는동안 반복
+		struct thread *t=list_entry(list_front(&sleep_list),struct thread,elem);//맨앞에꺼 저장
+		if(t -> wake_tick <= ticks){//비어있는지 확인
+			list_remove(&t->elem);
+			thread_unblock(t);
+		}else{
+			break;
+		}
+	} 
+}
+
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". 사용할 스케줄러 선택 */

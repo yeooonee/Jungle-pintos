@@ -112,6 +112,7 @@ struct thread {
 };
 void thread_sleep (struct thread *t);
 void thread_sleep_init(void);
+void thread_wake(int64_t ticks);
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
