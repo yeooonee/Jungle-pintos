@@ -89,13 +89,31 @@ timer_elapsed (int64_t then) {
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+
+//list_entry(a, struct thread, elem)->wake_tick < list_entry(b, struct thread, elem)
+bool wake_tick_less(
+	const struct list_elem *a,
+	const struct list_elem *b,
+	void*aux){//더 작은 정렬비교함수
+	return list_entry(a, struct thread, elem)->wake_tick < list_entry(b, struct thread, elem)->wake_tick;
+}
+
+
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+	struct thread *t = thread_current ();
 
+	int64_t start = timer_ticks ();
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+
+	enum intr_level old_level = intr_disable();//끄기전 이전인스트럽트저장
+	t -> wake_tick=start + ticks;
+	
+	list_insert_ordered( &sleep_list, &t->elem, wake_tick_less, NULL);//깨우기 비교
+		thread_block();
+	intr_set_level(old_level);//스레드 다시 실행하고 이전인스트럽트 복구
+	
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,16 +144,6 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-
-	while(!list_empty (&sleep_list)){//잠자는 스레드 확인
-		struct thread *t =
-			list_entry (list_front (&sleep_list),//리스트 맨앞의 스레드 가져옴
-						struct thread, elem);//리스트 요소 elem포함하는 thread찾음
-		if (t->wake_tick > ticks)//아직 깨어날 시간 안되면 반복 종료
-			break;
-		list_pop_front (&sleep_list);//깨어날 스레드 잠자는 목록제거
-		thread_unblock (t);//해당 스레드 블록에서 레디로 변경
-	}
 	thread_tick ();
 }
 
