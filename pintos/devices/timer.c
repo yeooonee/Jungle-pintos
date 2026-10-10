@@ -29,6 +29,9 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 
+/* sleep(blocked) list - tick 이 남은 리스트들 유지 */
+static struct list sleep_list;
+
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
@@ -37,6 +40,8 @@ timer_init (void) {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
 	   nearest. */
 	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
+
+	list_init (&sleep_list);	// 초기화 
 
 	outb (0x43, 0x34);    /* CW: counter 0, LSB then MSB, mode 2, binary. */
 	outb (0x40, count & 0xff);
@@ -87,14 +92,44 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
+/* list_less_func */
+// static bool
+// cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+// 	list_entry(a, struct thread, );
+// }
+
 /* Suspends execution for approximately TICKS timer ticks. */
 void
-timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+timer_sleep (int64_t ticks) { // 수정 필요 
+	int64_t start = timer_ticks ();	// 시작 시간 기록
+	enum intr_level old_level;
+	
+	struct thread *thr = thread_current();
 
+	// TODO 꺠어날 시각 계산
+	thr->wakeup_time = start + ticks;
+	
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	
+	// interrupt 막기
+	old_level = intr_disable;
+	
+	// sleep list 에 추가 (ticks 가 상대적으로 )
+	list_push_back(&sleep_list, &thr->elem);
+	// list_insert_ordered(&sleep_list, &thr->elem, cmp, NULL); 
+	// TODO 왜 NULL 넣는지 aux 가 뭐세요 
+	
+	// 자기 실행이 끝나면 block(sleep) 상태로 넣기 
+	thread_block();	// blocked
+
+	// remove ready list
+	
+	intr_set_level(old_level);
+
+
+
+	// while (timer_elapsed (start) < ticks)	// sleep 을 시작한 뒤 지금까지 흐른 틱 수 
+	// thread_yield (); //ready
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,6 +161,8 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	// 잠든 thread 들 깨우기
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
