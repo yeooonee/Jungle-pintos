@@ -93,10 +93,18 @@ timer_elapsed (int64_t then) {
 }
 
 /* list_less_func */
-// static bool
-// cmp (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-// 	list_entry(a, struct thread, );
-// }
+static bool
+p_a_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	// 두개 스레드 wake_time 필드 비교해서 bool 반환
+	struct thread *thr_a = list_entry(a, struct thread, elem);
+	struct thread *thr_b = list_entry(b, struct thread, elem);
+
+	if (thr_a->wakeup_time < thr_b->wakeup_time){
+		return true;
+	} else {
+		return false;
+	}
+}
 
 /* Suspends execution for approximately TICKS timer ticks. */
 void
@@ -115,8 +123,8 @@ timer_sleep (int64_t ticks) { // 수정 필요
 	old_level = intr_disable;
 	
 	// sleep list 에 추가 (ticks 가 상대적으로 )
-	list_push_back(&sleep_list, &thr->elem);
-	// list_insert_ordered(&sleep_list, &thr->elem, cmp, NULL); 
+	// list_push_back(&sleep_list, &thr->elem);
+	list_insert_ordered(&sleep_list, &thr->elem, p_a_less, NULL); 
 	// TODO 왜 NULL 넣는지 aux 가 뭐세요 
 	
 	// 자기 실행이 끝나면 block(sleep) 상태로 넣기 
@@ -125,7 +133,6 @@ timer_sleep (int64_t ticks) { // 수정 필요
 	// remove ready list
 	
 	intr_set_level(old_level);
-
 
 
 	// while (timer_elapsed (start) < ticks)	// sleep 을 시작한 뒤 지금까지 흐른 틱 수 
