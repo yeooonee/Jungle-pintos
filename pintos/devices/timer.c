@@ -135,28 +135,11 @@ timer_print_stats (void) {
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	struct thread *thr = thread_current();
-
-	// 잠든 thread 들 깨우기 
-
-	/* 현재 tick 기준으로 앞에것들만 ready list 로 보내기 */
-	for(size_t i = 0; i < list_size; i++){
-		if (thr->wakeup_time <= ticks){
-			/* sleep list 에서 빼기 */
-			list_remove(&thr->elem);
-
-			/* ready list 에 추가하기 */
-			thread_unblock(thr);
-		} else {
-			return;
-		}
-		/* 다음 스레드로 이동 */
-		thr = thr->elem.next;
-	}
-
 	ticks++;
 	thread_tick ();
 
+	// 잠든 thread 들 깨우기 
+	thread_remove_sleep_list(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

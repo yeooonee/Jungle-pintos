@@ -134,6 +134,7 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 void thread_add_sleep_list(int wakeup_time);
+void thread_remove_sleep_list(int64_t ticks);
 
 int thread_get_priority (void);
 void thread_set_priority (int);

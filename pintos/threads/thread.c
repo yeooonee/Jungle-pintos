@@ -336,6 +336,30 @@ thread_add_sleep_list(int wakeup_time){
 	thread_block();	// blocked
 }
 
+void
+thread_remove_sleep_list(int64_t ticks){
+	struct thread *thr;
+
+	/* 현재 tick 기준으로 앞에것들만 ready list 로 보내기 */
+	while(!list_empty(&sleep_list)){
+		thr = list_entry(list_front(&sleep_list), struct thread, elem);
+		// (thr->elem, struct thread, elem);
+		
+		if (thr->wakeup_time <= ticks){
+			/* sleep list 에서 빼기 */
+			list_remove(&thr->elem);
+
+			/* ready list 에 추가하기 */
+			thread_unblock(thr);
+		} else {
+			return;
+		}
+		
+	}
+}
+
+
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
