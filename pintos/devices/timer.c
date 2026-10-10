@@ -28,12 +28,12 @@ static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
-
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
 void
 timer_init (void) {
+	thread_sleep_init(); //자료구조 사용할수있도록 초기상태를 만듬
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
 	   nearest. */
 	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
@@ -88,13 +88,20 @@ timer_elapsed (int64_t then) {
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
-
+	struct thread *t = thread_current ();
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	
+	enum intr_level old_level = intr_disable();//끄기전 이전인스트럽트저장
+	int64_t start = timer_ticks ();
+	t -> wake_tick=start + ticks;
+	
+	thread_sleep(t);
+	thread_block();
+	intr_set_level(old_level);//스레드 다시 실행하고 이전인스트럽트 복구
+	
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -125,7 +132,9 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
+	thread_wake(ticks);
 	thread_tick ();
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

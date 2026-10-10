@@ -25,7 +25,7 @@
 #define THREAD_BASIC 0xd42df210
 
 /* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
+   that are ready to run but not actually running. 실제로 실행중이지않은 프로세스담음*/
 static struct list ready_list;
 
 /* Idle thread. */
@@ -49,9 +49,37 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
+/*timer threads*/
+static struct list sleep_list;//깨어날 시간이 아직안된 스레드 관리
+void thread_sleep_init(){
+	list_init(&sleep_list);
+}
+bool wake_tick_less(
+	const struct list_elem *a,
+	const struct list_elem *b,
+	void*aux){//더 작은 정렬비교함수
+	return list_entry(a, struct thread, elem)->wake_tick < list_entry(b, struct thread, elem)->wake_tick;
+}
+void thread_sleep(struct thread *t){//정렬
+	list_insert_ordered(&sleep_list, &t->elem, wake_tick_less, NULL);//깨우기 비교
+}
+//잠들어 있는 스레드 시간된거 깨우기
+void thread_wake(int64_t ticks){
+	while(!list_empty(&sleep_list)){//리스트 비어있는동안 반복
+		struct thread *t=list_entry(list_front(&sleep_list),struct thread,elem);//맨앞에꺼 저장
+		if(t -> wake_tick <= ticks){//비어있는지 확인
+			list_remove(&t->elem);
+			thread_unblock(t);
+		}else{
+			break;
+		}
+	} 
+}
+
+
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
-   Controlled by kernel command-line option "-o mlfqs". */
+   Controlled by kernel command-line option "-o mlfqs". 사용할 스케줄러 선택 */
 bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);
