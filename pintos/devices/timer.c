@@ -89,12 +89,23 @@ timer_elapsed (int64_t then) {
 
 /* Suspends execution for approximately TICKS timer ticks. */
 void
-timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+timer_sleep (int64_t ticks) { // 수정 필요 
+	int64_t start = timer_ticks ();	// 시작 시간 기록
+	enum intr_level old_level;
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	
+	/* 깨어날 시각 계산 */
+	int wakeup_time = start + ticks;
+
+	/* interrupt 막기 */
+	old_level = intr_disable();
+
+	/* 리스트 삽입 */
+	thread_add_sleep_list(wakeup_time);
+	
+	/* interrupt 복원 */
+	intr_set_level(old_level);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,6 +137,9 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	// 잠든 thread 들 깨우기 
+	thread_remove_sleep_list(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

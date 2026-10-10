@@ -28,6 +28,9 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+/* sleep list */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -108,6 +111,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -150,7 +154,7 @@ thread_tick (void) {
 		kernel_ticks++;
 
 	/* Enforce preemption. */
-	if (++thread_ticks >= TIME_SLICE)
+	if (++thread_ticks >= TIME_SLICE) // 어느정도 스레드 실행 보장하기 위해 추가됨
 		intr_yield_on_return ();
 }
 
@@ -307,6 +311,54 @@ thread_yield (void) {
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
+
+/* list_less_func */
+static bool
+p_a_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	// 두개 스레드 wake_time 필드 비교해서 bool 반환
+	struct thread *thr_a = list_entry(a, struct thread, elem);
+	struct thread *thr_b = list_entry(b, struct thread, elem);
+
+	return thr_a->wakeup_time < thr_b->wakeup_time;
+}
+
+void
+thread_add_sleep_list(int wakeup_time){
+	struct thread *thr = thread_current();
+
+	thr->wakeup_time = wakeup_time;
+		
+	/* sleep list 에 추가 (ticks 가 상대적으로 ) */
+	list_insert_ordered(&sleep_list, &thr->elem, p_a_less, NULL); 
+	// list_push_back(&sleep_list, &thr->elem);
+	
+	/* 자기 실행이 끝나면 block(sleep) 상태로 넣기 */
+	thread_block();	// blocked
+}
+
+void
+thread_remove_sleep_list(int64_t ticks){
+	struct thread *thr;
+
+	/* 현재 tick 기준으로 앞에것들만 ready list 로 보내기 */
+	while(!list_empty(&sleep_list)){
+		thr = list_entry(list_front(&sleep_list), struct thread, elem);
+		// (thr->elem, struct thread, elem);
+		
+		if (thr->wakeup_time <= ticks){
+			/* sleep list 에서 빼기 */
+			list_remove(&thr->elem);
+
+			/* ready list 에 추가하기 */
+			thread_unblock(thr);
+		} else {
+			return;
+		}
+		
+	}
+}
+
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
