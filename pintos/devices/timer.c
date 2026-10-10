@@ -99,11 +99,7 @@ p_a_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED
 	struct thread *thr_a = list_entry(a, struct thread, elem);
 	struct thread *thr_b = list_entry(b, struct thread, elem);
 
-	if (thr_a->wakeup_time < thr_b->wakeup_time){
-		return true;
-	} else {
-		return false;
-	}
+	return thr_a->wakeup_time < thr_b->wakeup_time;
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
@@ -125,12 +121,12 @@ timer_sleep (int64_t ticks) { // 수정 필요
 	// sleep list 에 추가 (ticks 가 상대적으로 )
 	// list_push_back(&sleep_list, &thr->elem);
 	list_insert_ordered(&sleep_list, &thr->elem, p_a_less, NULL); 
-	// TODO 왜 NULL 넣는지 aux 가 뭐세요 
+	// TODO 왜 NULL 넣는지 aux 가 뭐세요 -> 
 	
 	// 자기 실행이 끝나면 block(sleep) 상태로 넣기 
 	thread_block();	// blocked
 
-	// remove ready list
+	// remove ready list ??? 
 	
 	intr_set_level(old_level);
 
