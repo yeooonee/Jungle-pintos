@@ -89,12 +89,13 @@ timer_elapsed (int64_t then) {
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+/* 4틱만큼 현재 스레드 재우기*/
 void
 timer_sleep (int64_t ticks) {
 	if (ticks <= 0) return;
 	ASSERT(intr_get_level() == INTR_ON);
 	int64_t start = timer_ticks ();
-	thread_sleep(start + ticks);
+	thread_sleep(start + ticks); /* 깨울 시각을 계산해서 현재 스레드를 재우기 */
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -125,7 +126,7 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	thread_wakeup(ticks);
+	thread_wakeup(ticks); /* 깨울시각 된 스레드 깨우기*/
 	thread_tick ();
 }
 
