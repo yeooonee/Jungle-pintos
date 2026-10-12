@@ -342,14 +342,15 @@ thread_sleep (int64_t wakeup_tick){
 /* 깨울시간이 된 스레드를 sleeplist에서 제거하고 깨우기 */
 void
 thread_wakeup(int64_t now_tick) {
-	struct list_elem *e = list_begin (&sleep_list); 
-	while (e != list_end (&sleep_list)) { /* 리스트 끝까지 순회 (정렬돼 있어서 아직 깰 때가 아닌 스레드를 만나면 중단) */
-		struct thread *t = list_entry (e, struct thread, elem);
-		if (t->wakeup_tick <= now_tick){ /* 깨울 시간되면 리스트에서 제거하고 깨운다 */
-			e = list_remove(e);
+	while (!list_empty(&sleep_list)) {  /* 리스트 끝까지 순회 (정렬돼 있어서 아직 깰 때가 아닌 스레드를 만나면 중단) */
+		struct thread *t = list_entry (list_front(&sleep_list), struct thread, elem);
+
+		if (t->wakeup_tick <= now_tick){  /* 깨울 시간되면 리스트에서 제거하고 깨운다 */
+			list_remove(&t->elem);
 			thread_unblock(t);
-		}else
-			break;
+		} else {
+			return;
+		}
 	}
 }
 
