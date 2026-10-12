@@ -89,7 +89,7 @@ timer_elapsed (int64_t then) {
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
-/* 4틱만큼 현재 스레드 재우기*/
+/* 현재 스레드 재우기*/
 void
 timer_sleep (int64_t ticks) {
 	if (ticks <= 0) return;
