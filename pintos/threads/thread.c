@@ -337,14 +337,15 @@ thread_sleep (int64_t wakeup_tick){
 
 void
 thread_wakeup(int64_t now_tick) {
-	struct list_elem *e = list_begin (&sleep_list);
-	while (e != list_end (&sleep_list)) {
-		struct thread *t = list_entry (e, struct thread, elem);
+	while (!list_empty(&sleep_list)) {
+		struct thread *t = list_entry (list_front(&sleep_list), struct thread, elem);
+
 		if (t->wakeup_tick <= now_tick){
-			e = list_remove(e);
+			list_remove(&t->elem);
 			thread_unblock(t);
-		}else
-			break;
+		} else {
+			return;
+		}
 	}
 }
 
