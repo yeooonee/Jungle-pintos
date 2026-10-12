@@ -134,7 +134,7 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 void thread_sleep (int64_t wakeup_tick); /* sleep list 이름 */
-void thread_wakeup (int64_t now_tick);  /* 깨울시간 된 스레드 깨우기 */
+void thread_wakeup (int64_t now_tick);  /* 현재 스레드를 wakeup_tick까지 재우기 (sleep_list에 넣고 block) */
 
 int thread_get_priority (void);
 void thread_set_priority (int);

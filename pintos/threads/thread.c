@@ -65,7 +65,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-/* 깨울 시각을 기준으로 오름차순 정렬 */
+/* 깨울 시각 오름차순 정렬용 비교 함수 */
 static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Returns true if T appears to point to a valid thread. */
@@ -313,13 +313,15 @@ thread_yield (void) {
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
-/* 깨울 시각 기준으로 빠른스레드가 앞으로 오도록 비교 */
+
+/* 깨울 시각이 빠른 스레드가 앞에 오도록 비교 */
 static bool
 wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	struct thread *ta = list_entry (a, struct thread, elem);
 	struct thread *tb = list_entry (b, struct thread, elem);
 	return ta->wakeup_tick < tb->wakeup_tick;   
 }
+
 /* [sleep list]현재 스레드 재우기 */
 void
 thread_sleep (int64_t wakeup_tick){
@@ -335,11 +337,13 @@ thread_sleep (int64_t wakeup_tick){
 
 	intr_set_level (old_level);
 }
+
+
 /* 깨울시간이 된 스레드를 sleeplist에서 제거하고 깨우기 */
 void
 thread_wakeup(int64_t now_tick) {
-	struct list_elem *e = list_begin (&sleep_list); /* sleep list 첫번째 요소 확인 */
-	while (e != list_end (&sleep_list)) { /* list 도달할때까지 확인 */
+	struct list_elem *e = list_begin (&sleep_list); 
+	while (e != list_end (&sleep_list)) { /* 리스트 끝까지 순회 (정렬돼 있어서 아직 깰 때가 아닌 스레드를 만나면 중단) */
 		struct thread *t = list_entry (e, struct thread, elem);
 		if (t->wakeup_tick <= now_tick){ /* 깨울 시간되면 리스트에서 제거하고 깨운다 */
 			e = list_remove(e);
