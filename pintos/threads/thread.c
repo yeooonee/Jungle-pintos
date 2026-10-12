@@ -375,10 +375,15 @@ thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 
 	/* 현재 스레드 우선순위가 높으면 기존 점유 스레드가 양보하기 */
-	struct thread *max_t = list_max(&ready_list, priority_high, NULL);
-	if (new_priority > max_t->priority){
-		thread_yield();
+	enum intr_level old_level = intr_disable();
+
+	if (!list_empty(&ready_list)) {
+		struct thread *max_t = list_entry(list_min(&ready_list, priority_high, NULL), struct thread, elem);
+		if (new_priority < max_t->priority){
+			thread_yield();
+		}
 	}
+	intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
