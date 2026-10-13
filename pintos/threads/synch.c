@@ -119,7 +119,9 @@ sema_up (struct semaphore *sema) {
 	intr_set_level (old_level);
 
 	/* 깨어나는 스레드가 우선순위 높을 시 점유 변경  */
-	preemption_priority();
+	if (!intr_context()){
+		preemption_priority();
+	}
 }
 
 static void sema_test_helper (void *sema_);
