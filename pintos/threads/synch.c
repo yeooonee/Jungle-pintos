@@ -296,6 +296,23 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	lock_acquire (lock);
 }
 
+
+bool
+cond_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
+	struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
+
+	if (list_empty(&sa->semaphore.waiters) || list_empty(&sb->semaphore.waiters)){
+		return false;
+	}
+
+	struct thread *ta = list_entry (list_front(&sa->semaphore.waiters), struct thread, elem);
+	struct thread *tb = list_entry (list_front(&sb->semaphore.waiters), struct thread, elem);
+
+	return ta->priority > tb->priority;
+}
+
+
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
@@ -311,6 +328,8 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	if (!list_empty (&cond->waiters)){
+		/* 우선순위 내림차순 정렬 */
+		list_sort(&cond->waiters, cond_priority_compare, NULL);
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
 	}
