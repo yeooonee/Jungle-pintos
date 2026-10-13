@@ -16,8 +16,8 @@
  
 ## 🔍 변경 사항
 <!-- 수정한 파일과 함수, 추가한 자료구조/필드를 구체적으로 적고 수정 사항을 상세하게 작성해주세요. (timer_sleep 함수 수정 등)-->
-| 파일 | 변경 내용 |
-| --- | --- |
+| 파일 | 함수 | 변경 내용 |
+| --- | --- | --- |
 | `threads/thread.c` | timer_sleep 함수 ~ 수정 |
 | `include/threads/thread.h` | thread_sleep 함수 추가 |
  
