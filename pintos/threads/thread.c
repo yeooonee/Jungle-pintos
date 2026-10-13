@@ -177,15 +177,13 @@ preemption_priority (void) {
 
 	old_level = intr_disable ();
 
-	if (list_empty(&ready_list)){
-		intr_set_level (old_level);
-		return; 
+	if (!list_empty(&ready_list)){
+		struct thread *t = list_entry (list_front(&ready_list), struct thread, elem);
+		if (t->priority > curr->priority) {
+			thread_yield();
+		}
 	}
 
-	struct thread *t = list_entry (list_front(&ready_list), struct thread, elem);
-	if (t->priority > curr->priority) {
-		thread_yield();
-	}
 	intr_set_level (old_level);
 }
 
@@ -351,7 +349,7 @@ static bool
 priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	struct thread *ta = list_entry (a, struct thread, elem);
 	struct thread *tb = list_entry (b, struct thread, elem);
-	return ta->priority > tb->priority;
+	return ta->priority > tb->priority; /* tb : 기존 리스트 값 */
 }
 
 /* [sleep list]현재 스레드 재우기 */
