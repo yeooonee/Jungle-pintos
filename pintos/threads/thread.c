@@ -67,6 +67,7 @@ static tid_t allocate_tid (void);
 
 /* 깨울 시각 오름차순 정렬용 비교 함수 */
 static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
+static bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -167,6 +168,27 @@ thread_print_stats (void) {
 			idle_ticks, kernel_ticks, user_ticks);
 }
 
+void
+preemption_priority (void) {
+	enum intr_level old_level;
+	struct thread *curr = thread_current ();
+
+	ASSERT (!intr_context ());
+
+	old_level = intr_disable ();
+
+	if (list_empty(&ready_list)){
+		intr_set_level (old_level);
+		return; 
+	}
+
+	struct thread *t = list_entry (list_front(&ready_list), struct thread, elem);
+	if (t->priority > curr->priority) {
+		thread_yield();
+	}
+	intr_set_level (old_level);
+}
+
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
    and adds it to the ready queue.  Returns the thread identifier
@@ -186,6 +208,7 @@ tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
+	struct thread *curr = thread_current ();
 	tid_t tid;
 
 	ASSERT (function != NULL);
@@ -212,6 +235,7 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
+	preemption_priority ();
 
 	return tid;
 }
@@ -246,7 +270,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	list_insert_ordered (&ready_list, &t->elem, priority_compare, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -309,7 +333,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &curr->elem, priority_compare, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -320,6 +344,14 @@ wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNU
 	struct thread *ta = list_entry (a, struct thread, elem);
 	struct thread *tb = list_entry (b, struct thread, elem);
 	return ta->wakeup_tick < tb->wakeup_tick;   
+}
+
+/* 우선 순위 값이 높은 스레드가 앞에 오도록 비교 */
+static bool
+priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	struct thread *ta = list_entry (a, struct thread, elem);
+	struct thread *tb = list_entry (b, struct thread, elem);
+	return ta->priority > tb->priority;
 }
 
 /* [sleep list]현재 스레드 재우기 */
@@ -358,6 +390,8 @@ thread_wakeup(int64_t now_tick) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	preemption_priority();
+
 }
 
 /* Returns the current thread's priority. */
