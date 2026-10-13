@@ -67,7 +67,7 @@ static tid_t allocate_tid (void);
 
 /* 깨울 시각 오름차순 정렬용 비교 함수 */
 static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
-static bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -262,6 +262,7 @@ thread_block (void) {
 void
 thread_unblock (struct thread *t) {
 	enum intr_level old_level;
+	struct thread *curr = thread_current ();
 
 	ASSERT (is_thread (t));
 
@@ -270,6 +271,7 @@ thread_unblock (struct thread *t) {
 	list_insert_ordered (&ready_list, &t->elem, priority_compare, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
+	
 }
 
 /* Returns the name of the running thread. */

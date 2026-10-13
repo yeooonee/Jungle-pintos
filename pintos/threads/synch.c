@@ -66,7 +66,9 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) {
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+		/* 자원없는 세마 대기열에 삽입하면서 다음 스레드 우선순위 비교*/
+		list_insert_ordered(&sema->waiters,&thread_current ()->elem, priority_compare, NULL);
+		// list_push_back (&sema->waiters, &thread_current ()->elem);
 		thread_block ();
 	}
 	sema->value--;
@@ -102,19 +104,34 @@ sema_try_down (struct semaphore *sema) {
    and wakes up one thread of those waiting for SEMA, if any.
 
    This function may be called from an interrupt handler. */
+
+/* 대기열이 우선순위순으로 정렬되어 있으므로 가장 앞의 스레드를 꺼내 깨우기 */
 void
 sema_up (struct semaphore *sema) {
 	enum intr_level old_level;
-
+	struct thread *curr = thread_current ();
+	struct thread *p = NULL;
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+	//선점 작업중 컬이랑 깨운 스레드 비교 할거 담기
+	if (!list_empty (&sema->waiters)){
+		p = (list_entry (list_pop_front (&sema->waiters),
+						struct thread, elem));
+	thread_unblock(p);
+	}
 	sema->value++;
 	intr_set_level (old_level);
+
+    	if (p!=NULL&& p->priority > curr->priority) { /* 우선순위 높은지 비교하고 실행중스레드면 인터럽트 종료후 실행*/
+		
+        	if (intr_context())
+            	intr_yield_on_return();
+        	else
+            	thread_yield();
+    	}
 }
+
 
 static void sema_test_helper (void *sema_);
 
