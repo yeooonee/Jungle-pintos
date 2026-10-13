@@ -344,8 +344,7 @@ wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNU
 }
 
 /* 우선 순위 값이 높은 스레드가 앞에 오도록 비교 */
-static bool
-priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	struct thread *ta = list_entry (a, struct thread, elem);
 	struct thread *tb = list_entry (b, struct thread, elem);
 	return ta->priority > tb->priority; /* tb : 기존 리스트 값 */
