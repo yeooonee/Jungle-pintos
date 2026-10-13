@@ -206,7 +206,6 @@ tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
-	struct thread *curr = thread_current ();
 	tid_t tid;
 
 	ASSERT (function != NULL);

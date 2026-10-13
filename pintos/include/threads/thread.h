@@ -133,7 +133,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
-void preemption_priority (void); /* preemption 작업(priority 기준) 함수 ㄴ*/
+void preemption_priority (void); /* preemption 작업(priority 기준) 함수*/
 
 void thread_sleep (int64_t wakeup_tick); /* sleep list 이름 */
 void thread_wakeup (int64_t now_tick);  /* 현재 스레드를 wakeup_tick까지 재우기 (sleep_list에 넣고 block) */
