@@ -116,6 +116,7 @@ sema_up (struct semaphore *sema) {
 	old_level = intr_disable ();
 	//선점 작업중 컬이랑 깨운 스레드 비교 할거 담기
 	if (!list_empty (&sema->waiters)){
+		list_sort(&sema->waiters,priority_compare,NULL);
 		p = (list_entry (list_pop_front (&sema->waiters),
 						struct thread, elem));
 	thread_unblock(p);
@@ -289,9 +290,10 @@ cond_init (struct condition *cond) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
 void
 cond_wait (struct condition *cond, struct lock *lock) {
-	struct semaphore_elem waiter;
+	struct semaphore_elem waiter; 
 
 	ASSERT (cond != NULL);
 	ASSERT (lock != NULL);
@@ -299,11 +301,24 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	sema_init (&waiter.semaphore, 0);
-	list_push_back (&cond->waiters, &waiter.elem);
+	list_push_back(&cond->waiters,&waiter.elem);
+	// list_push_back (&cond->waiters, &waiter.elem);
+
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);
 }
+
+
+/* 조건변수 내림차순 정렬*/
+ static bool cond_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
+	struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
+	struct thread *ta = list_entry(list_front(&sa->semaphore.waiters),struct thread,elem);
+	struct thread *tb = list_entry(list_front(&sb->semaphore.waiters),struct thread,elem);
+	return ta->priority > tb-> priority; /* sb : 기존 리스트 값 */
+}//&waiter.semaphore
+
 
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
@@ -314,14 +329,19 @@ cond_wait (struct condition *cond, struct lock *lock) {
    interrupt handler. */
 void
 cond_signal (struct condition *cond, struct lock *lock UNUSED) {
+	struct semaphore_elem waiter;
 	ASSERT (cond != NULL);
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (!list_empty (&cond->waiters))
+	/* 먼저 들어온 스레드와 대기열 비교*/
+	// list_insert_ordered(&cond->waiters,&waiter.elem, cond_compare, NULL);	
+	if (!list_empty (&cond->waiters)) {
+		list_sort(&cond->waiters,cond_compare,NULL);
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
+	}
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
