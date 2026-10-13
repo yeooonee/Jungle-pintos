@@ -66,8 +66,8 @@ static void schedule (void);
 static tid_t allocate_tid (void);
 
 /* 깨울 시각 오름차순 정렬용 비교 함수 */
-static bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
-static bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -336,7 +336,7 @@ thread_yield (void) {
 }
 
 /* 깨울 시각이 빠른 스레드가 앞에 오도록 비교 */
-static bool
+bool
 wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	struct thread *ta = list_entry (a, struct thread, elem);
 	struct thread *tb = list_entry (b, struct thread, elem);
@@ -344,7 +344,7 @@ wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNU
 }
 
 /* 우선 순위 값이 높은 스레드가 앞에 오도록 비교 */
-static bool
+bool
 priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	struct thread *ta = list_entry (a, struct thread, elem);
 	struct thread *tb = list_entry (b, struct thread, elem);

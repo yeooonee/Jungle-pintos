@@ -137,6 +137,8 @@ void preemption_priority (void); /* preemption 작업(priority 기준) 함수*/
 
 void thread_sleep (int64_t wakeup_tick); /* sleep list 이름 */
 void thread_wakeup (int64_t now_tick);  /* 현재 스레드를 wakeup_tick까지 재우기 (sleep_list에 넣고 block) */
+bool wakeup_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
