@@ -141,6 +141,8 @@ void thread_wakeup (int64_t now_tick);  /* 현재 스레드를 wakeup_tick까지
 int thread_get_priority (void);
 void thread_set_priority (int);
 
+bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);

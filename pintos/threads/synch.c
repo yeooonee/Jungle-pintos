@@ -109,11 +109,19 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
+	if (!list_empty (&sema->waiters)) {
+		/* sema 깨우기 전에 priority 내림차순으로 정렬 추가 */
+		list_sort(&sema->waiters, priority_compare, NULL);
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
+	}
 	sema->value++;
 	intr_set_level (old_level);
+
+	/* 깨어나는 스레드가 우선순위 높을 시 점유 변경  */
+	if (!intr_context()){
+		preemption_priority();
+	}
 }
 
 static void sema_test_helper (void *sema_);
@@ -288,6 +296,23 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	lock_acquire (lock);
 }
 
+
+bool
+cond_priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
+	struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
+	struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
+
+	if (list_empty(&sa->semaphore.waiters) || list_empty(&sb->semaphore.waiters)){
+		return false;
+	}
+
+	struct thread *ta = list_entry (list_front(&sa->semaphore.waiters), struct thread, elem);
+	struct thread *tb = list_entry (list_front(&sb->semaphore.waiters), struct thread, elem);
+
+	return ta->priority > tb->priority;
+}
+
+
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
@@ -302,9 +327,12 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (!intr_context ());
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (!list_empty (&cond->waiters))
+	if (!list_empty (&cond->waiters)){
+		/* 우선순위 내림차순 정렬 */
+		list_sort(&cond->waiters, cond_priority_compare, NULL);
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
+	}
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
