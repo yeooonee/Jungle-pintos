@@ -85,6 +85,10 @@ typedef int tid_t;
  * only because they are mutually exclusive: only a thread in the
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
+
+/* synch.h에 정의된 lock을 포인터로만 쓰기 위한 전방 선언 */
+struct lock;
+
 struct thread {
 	/* Owned by thread.c. */
 	tid_t tid;                          /* Thread identifier. */
@@ -92,6 +96,7 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	int64_t wakeup_tick;				/* 깨어날 시각 */
+	int original_priority;				/* 기존 Priority 저장 */
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
@@ -142,6 +147,7 @@ int thread_get_priority (void);
 void thread_set_priority (int);
 
 bool priority_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
+void refresh_priority (void);	/* 원래 우선순위와 남은 기부 중 최댓값으로 재계산 */
 
 int thread_get_nice (void);
 void thread_set_nice (int);

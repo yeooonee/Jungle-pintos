@@ -173,14 +173,15 @@ preemption_priority (void) {
 	enum intr_level old_level;
 	struct thread *curr = thread_current ();
 
-	ASSERT (!intr_context ());
-
 	old_level = intr_disable ();
 
 	if (!list_empty(&ready_list)){
 		struct thread *t = list_entry (list_front(&ready_list), struct thread, elem);
 		if (t->priority > curr->priority) {
-			thread_yield();
+			if (intr_context ())
+				intr_yield_on_return ();   /* 핸들러 끝나고 돌아갈 때 양보 예약 */
+			else
+				thread_yield ();
 		}
 	}
 
@@ -387,8 +388,8 @@ thread_wakeup(int64_t now_tick) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	thread_current ()->original_priority = new_priority;
 	preemption_priority();
-
 }
 
 /* Returns the current thread's priority. */
@@ -485,6 +486,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
+	t->original_priority = priority;
 	t->magic = THREAD_MAGIC;
 }
 
