@@ -176,7 +176,7 @@ preemption_priority (void) {
 	old_level = intr_disable ();
 
 	if (!list_empty(&ready_list)){
-		struct thread *t = list_entry (list_front(&ready_list), struct thread, elem);
+		struct thread *t = list_entry (list_min (&ready_list, priority_compare, NULL), struct thread, elem);
 		if (t->priority > curr->priority) {
 			if (intr_context ())
 				intr_yield_on_return ();   /* 핸들러 끝나고 돌아갈 때 양보 예약 */
@@ -268,7 +268,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_insert_ordered (&ready_list, &t->elem, priority_compare, NULL);
+	list_push_back (&ready_list, &t->elem);	/* 꺼낼 때 최댓값을 고르므로 정렬 삽입 불필요 */
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -331,7 +331,7 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_insert_ordered (&ready_list, &curr->elem, priority_compare, NULL);
+		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -384,12 +384,32 @@ thread_wakeup(int64_t now_tick) {
 	}
 }
 
+/* 현재 스레드의 우선순위를 '원래 값'과 '남은 기부자 중 최댓값' 중 큰 값으로 재계산.
+   인터럽트가 꺼진 상태에서 호출해야 함. */
+void
+refresh_priority (void) {
+	struct thread *curr = thread_current ();
+	int max_priority = curr->original_priority;
+	struct list_elem *e;
+
+	ASSERT (intr_get_level () == INTR_OFF);
+
+	for (e = list_begin (&curr->donations); e != list_end (&curr->donations); e = list_next (e)) {
+		struct thread *donor = list_entry (e, struct thread, donation_elem);
+		if (donor->priority > max_priority)
+			max_priority = donor->priority;
+	}
+	curr->priority = max_priority;	/* 중간에 낮은 값이 노출되지 않도록 마지막에 한 번만 대입 */
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
-	thread_current ()->original_priority = new_priority;
-	preemption_priority();
+	enum intr_level old_level = intr_disable ();
+	thread_current ()->original_priority = new_priority;	/* 원래 값만 변경 */
+	refresh_priority ();									/* 기부 고려해 실제 값 재계산 */
+	intr_set_level (old_level);
+	preemption_priority ();
 }
 
 /* Returns the current thread's priority. */
@@ -487,6 +507,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->original_priority = priority;
+	t->wait_on_lock = NULL;
+	list_init (&t->donations);
 	t->magic = THREAD_MAGIC;
 }
 
@@ -499,8 +521,12 @@ static struct thread *
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
-	else
-		return list_entry (list_pop_front (&ready_list), struct thread, elem);
+	else {
+		/* 가장 높은 우선순위(같으면 먼저 들어온 스레드)를 골라 꺼냄 */
+		struct list_elem *max = list_min (&ready_list, priority_compare, NULL);
+		list_remove (max);
+		return list_entry (max, struct thread, elem);
+	}
 }
 
 /* Use iretq to launch the thread */

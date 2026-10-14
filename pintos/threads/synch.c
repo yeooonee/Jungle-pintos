@@ -110,10 +110,10 @@ sema_up (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	if (!list_empty (&sema->waiters)) {
-		/* sema 깨우기 전에 priority 내림차순으로 정렬 추가 */
-		list_sort(&sema->waiters, priority_compare, NULL);
-		thread_unblock (list_entry (list_pop_front (&sema->waiters),
-					struct thread, elem));
+		/* 대기 중 기부로 우선순위가 바뀌었을 수 있으니 꺼낼 때 최댓값 선택 */
+		struct list_elem *max = list_min (&sema->waiters, priority_compare, NULL);
+		list_remove (max);
+		thread_unblock (list_entry (max, struct thread, elem));
 	}
 	sema->value++;
 	intr_set_level (old_level);
@@ -182,6 +182,40 @@ lock_init (struct lock *lock) {
 	sema_init (&lock->semaphore, 1);
 }
 
+/* 락을 막 얻은 NEW_HOLDER에게, 아직 이 락을 기다리는 스레드들의 기부를 옮겨 붙인다.
+   인터럽트가 꺼진 상태에서 호출. */
+static void
+inherit_waiters (struct lock *lock, struct thread *new_holder) {
+	struct list_elem *e;
+
+	if (thread_mlfqs)
+		return;
+	for (e = list_begin (&lock->semaphore.waiters);
+	     e != list_end (&lock->semaphore.waiters); e = list_next (e)) {
+		struct thread *waiter = list_entry (e, struct thread, elem);
+		list_push_back (&new_holder->donations, &waiter->donation_elem);
+		if (waiter->priority > new_holder->priority)
+			new_holder->priority = waiter->priority;
+	}
+}
+
+/* T가 기다리는 락의 holder에게 우선순위를 기부하고,
+   holder도 다른 락을 기다리면 따라 올라가며 반복 (nest/chain, 최대 8단계). */
+static void
+donate_priority (struct thread *t) {
+	int priority = t->priority;		/* 위로 전달할 값 */
+	int depth;
+
+	for (depth = 0; depth < 8 && t->wait_on_lock != NULL; depth++) {
+		struct thread *holder = t->wait_on_lock->holder;
+		if (holder == NULL)
+			break;
+		if (holder->priority < priority)
+			holder->priority = priority;	/* 필요할 때만 올림 */
+		t = holder;						/* 한 칸 위로 */
+	}
+}
+
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -190,6 +224,7 @@ lock_init (struct lock *lock) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
 void
 lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
@@ -197,13 +232,26 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!lock_held_by_current_thread (lock));
 
 	struct thread *curr = thread_current ();
-	enum intr_level old_level = intr_disable ();
-	if (lock->holder != NULL && lock->holder->priority < curr->priority)
-		lock->holder->priority = curr->priority;		/* holder에게 내 우선순위 빌려주기 */
-	intr_set_level (old_level);
+	enum intr_level old_level = intr_disable ();	/* 확인~holder 지정까지 한 덩어리 */
 
-	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+	/* sema_down을 직접 풀어 쓴 루프: 깨어났는데 그 사이 다른 스레드가 락을 다시 잡았으면
+	   '새 holder'에게 기부를 다시 등록한 뒤 잠든다. */
+	while (lock->semaphore.value == 0) {
+		ASSERT (lock->holder != NULL);
+		if (!thread_mlfqs) {
+			curr->wait_on_lock = lock;
+			list_push_back (&lock->holder->donations, &curr->donation_elem);
+			donate_priority (curr);
+		}
+		list_push_back (&lock->semaphore.waiters, &curr->elem);
+		thread_block ();
+	}
+	lock->semaphore.value--;
+
+	curr->wait_on_lock = NULL;
+	lock->holder = curr;
+	inherit_waiters (lock, curr);	/* 4-4: 아직 기다리는 스레드들의 기부를 내게 연결 */
+	intr_set_level (old_level);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -219,9 +267,13 @@ lock_try_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	enum intr_level old_level = intr_disable ();
 	success = sema_try_down (&lock->semaphore);
-	if (success)
+	if (success) {
 		lock->holder = thread_current ();
+		inherit_waiters (lock, lock->holder);	/* 4-4와 같은 이유 */
+	}
+	intr_set_level (old_level);
 	return success;
 }
 
@@ -237,9 +289,22 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	struct thread *curr = thread_current ();
-	curr->priority = curr->original_priority; /* 빌린 우선순위 반납 */
+	enum intr_level old_level = intr_disable ();
+
+	/* 이 락 때문에 기부한 스레드만 제거 (list_remove는 다음 원소를 반환) */
+	struct list_elem *e = list_begin (&curr->donations);
+	while (e != list_end (&curr->donations)) {
+		struct thread *donor = list_entry (e, struct thread, donation_elem);
+		if (donor->wait_on_lock == lock)
+			e = list_remove (e);
+		else
+			e = list_next (e);
+	}
+	refresh_priority ();	/* 기초본의 '원복' 대신 '재계산' */
+
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
+	intr_set_level (old_level);
 }
 
 /* Returns true if the current thread holds LOCK, false
