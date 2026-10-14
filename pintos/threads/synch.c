@@ -190,13 +190,27 @@ lock_init (struct lock *lock) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
+
 void
 lock_acquire (struct lock *lock) {
+	struct thread *curr = thread_current();
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	sema_down (&lock->semaphore);
+	if(lock->holder != NULL){ /* 락 가진 스레드 확인*/
+		curr->waiting_lock = lock; /*현재 스레드가 기다리는 락 주소 저장*/
+		list_push_back(&lock->holder->donors_list, &curr->donors_link); /* 점유자 스레드의 기부자 목록 */
+		if(curr->priority > lock->holder->priority){ /* 우선순위 비교 (현재 스레드>점유자)*/
+			lock->holder->priority = curr->priority;
+		}
+		// 	lock->holder->priority = thread_current()->priority;
+		// 	list_remove(&lock->holder->elem);/*세마랑 다른대기에서 블록된지도 봐야됨*/
+		// 	list_insert_ordered (&ready_list, &t->elem, priority_compare, NULL);/*다시 정렬 재삽입*/
+		} 
+
+	sema_down (&lock->semaphore); /* 현재스레드에 락 획득하려는 요청*/
 	lock->holder = thread_current ();
 }
 
