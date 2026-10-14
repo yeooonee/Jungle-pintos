@@ -196,8 +196,18 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	/* 우선순위 비교 (기존 우선순위 < 새로 들어오는 애 우선순위) */
+	if(lock->holder->priority < thread_current()->priority){
+		/* 기존 값 보존 */
+		if (lock->holder->original_priority == 0)	// TODO 초기값 조건 확인해보기
+			lock->holder->original_priority = lock->holder->priority;
+		/* 현재 락 우선순위 바꿔주기 */
+		lock->holder->priority = thread_current()->priority;
+	}
+
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
+	
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -230,11 +240,20 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
+	/* 기부받은 값 대신 기존 자신의 우선순위 값으로 돌아간다. */
+	if (lock->holder->original_priority){ /* 기존 값이 있으면 */
+		/* 원래 우선순위로 복원 */
+		lock->holder->priority = lock->holder->original_priority;
+		lock->holder->original_priority = 0; /* original priority 값 초기화 */
+	}
 	lock->holder = NULL;
-	sema_up (&lock->semaphore);
+	sema_up (&lock->semaphore); /* 대기자 깨우기 */
+
+
+
 }
 
-/* Returns true if the current thread holds LOCK, false
+/* Returns true if t he current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
 bool
