@@ -197,7 +197,7 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!lock_held_by_current_thread (lock));
 
 	/* 우선순위 비교 (기존 우선순위 < 새로 들어오는 애 우선순위) */
-	if(lock->holder->priority < thread_current()->priority){
+	if(lock->holder && lock->holder->priority < thread_current()->priority){
 		/* 기존 값 보존 */
 		if (lock->holder->original_priority == 0)	// TODO 초기값 조건 확인해보기
 			lock->holder->original_priority = lock->holder->priority;
@@ -241,14 +241,13 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	/* 기부받은 값 대신 기존 자신의 우선순위 값으로 돌아간다. */
-	if (lock->holder->original_priority){ /* 기존 값이 있으면 */
+	if (lock->holder && lock->holder->original_priority){ /* 기존 값이 있으면 */
 		/* 원래 우선순위로 복원 */
 		lock->holder->priority = lock->holder->original_priority;
 		lock->holder->original_priority = 0; /* original priority 값 초기화 */
 	}
 	lock->holder = NULL;
 	sema_up (&lock->semaphore); /* 대기자 깨우기 */
-
 
 
 }
